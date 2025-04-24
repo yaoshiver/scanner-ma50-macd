@@ -45,22 +45,23 @@ def check_conditions(df):
     if "Close" not in df.columns or len(df) < 60:
         return False
 
-    df["MA50"] = ta.trend.sma_indicator(df["Close"], window=50)
-    macd = ta.trend.macd(df["Close"])
-    signal = ta.trend.macd_signal(df["Close"])
-    
-    if macd.isna().sum() > 0 or signal.isna().sum() > 0:
+    try:
+        ma50_indicator = ta.trend.SMAIndicator(close=df["Close"], window=50)
+        df["MA50"] = ma50_indicator.sma_indicator()
+        macd = ta.trend.MACD(close=df["Close"])
+        df["MACD"] = macd.macd()
+        df["MACD_SIGNAL"] = macd.macd_signal()
+
+        if df[["MA50", "MACD", "MACD_SIGNAL"]].isna().any().any():
+            return False
+
+        is_above_ma = df["Close"].iloc[-1] > df["MA50"].iloc[-1]
+        macd_now, macd_prev = df["MACD"].iloc[-1], df["MACD"].iloc[-2]
+        signal_now, signal_prev = df["MACD_SIGNAL"].iloc[-1], df["MACD_SIGNAL"].iloc[-2]
+
+        cross_up = macd_prev < signal_prev and macd_now > signal_now
+        is_positive_zone = macd_now > 0 and signal_now > 0
+
+        return is_above_ma and cross_up and is_positive_zone
+    except:
         return False
-
-    is_above_ma = df["Close"].iloc[-1] > df["MA50"].iloc[-1]
-    macd_now, macd_prev = macd.iloc[-1], macd.iloc[-2]
-    signal_now, signal_prev = signal.iloc[-1], signal.iloc[-2]
-
-    cross_up = macd_prev < signal_prev and macd_now > signal_now
-    is_positive_zone = macd_now > 0 and signal_now > 0
-
-    return is_above_ma and cross_up and is_positive_zone
-
-df = fetch_data(ticker, interval)
-if df is None or df.empty:
-    print(f"{ticker} - {interval} : Aucun résultat")
