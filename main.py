@@ -46,23 +46,5 @@ def is_above_ma50(df):
     except Exception as e:
         return False
 
-for ticker in TICKERS:
-    ticker = ticker.strip().upper()
-    row = {"Ticker": ticker}
-    score = 0
-    for label, interval in intervals.items():
-        df = fetch_data(ticker, interval)
-        status = is_above_ma50(df)
-        row[label] = "✅" if status else "❌"
-        score += 1 if status else 0
-    row["Score"] = score
-    results.append(row)
 
-# Affichage du tableau
-st.subheader("📈 Résultats classés par force relative (MA50)")
-
-df_results = pd.DataFrame(results)
-df_results = df_results.sort_values(by="Score", ascending=False)
-
-st.dataframe(df_results, use_container_width=True)
 
