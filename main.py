@@ -65,3 +65,53 @@ def check_conditions(df):
         return is_above_ma and cross_up and is_positive_zone
     except:
         return False
+
+st.header("Résultats du Scanner")
+
+TIMEFRAMES = {
+    "1d": "Daily",
+    "1wk": "Weekly",
+    "4h": "4h"
+}
+
+results = []
+
+def process_ticker(ticker, is_crypto=False):
+    result = {"Ticker": ticker.strip()}
+    for interval, label in TIMEFRAMES.items():
+        if is_crypto:
+            df = get_crypto_data(ticker)
+        else:
+            try:
+                df = yf.download(ticker.strip(), period="3mo", interval=interval)
+                df.dropna(inplace=True)
+            except:
+                df = None
+
+        if df is None or df.empty:
+            result[label] = "❌"
+        else:
+            try:
+                result[label] = "✅" if check_conditions(df) else "❌"
+            except:
+                result[label] = "❌"
+
+    score = sum([1 for tf in TIMEFRAMES.values() if result.get(tf) == "✅"])
+    result["Score"] = score
+    return result
+
+# Traiter tous les tickers
+for ticker in TICKERS_STOCKS:
+    if ticker.strip():
+        results.append(process_ticker(ticker.strip(), is_crypto=False))
+
+for crypto in TICKERS_CRYPTOS:
+    if crypto.strip():
+        results.append(process_ticker(crypto.strip(), is_crypto=True))
+
+# Afficher le tableau
+if results:
+    df_results = pd.DataFrame(results).sort_values(by="Score", ascending=False)
+    st.dataframe(df_results, use_container_width=True)
+else:
+    st.warning("Aucun actif n’a pu être analysé. Vérifiez vos tickers.")
