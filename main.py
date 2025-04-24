@@ -35,13 +35,17 @@ def fetch_data(ticker, interval):
         return None
 
 def is_above_ma50(df):
-    if df is None or "Close" not in df.columns or len(df) < 60:
+    try:
+        if df is None or "Close" not in df.columns or len(df) < 60:
+            return False
+        indicator = ta.trend.SMAIndicator(close=df["Close"], window=50)
+        ma50 = indicator.sma_indicator()
+        if ma50.isna().sum() > 0:
+            return False
+        return df["Close"].iloc[-1] > ma50.iloc[-1]
+    except Exception as e:
         return False
-    ma50 = ta.trend.sma_indicator(df["Close"], window=50)
-    return df["Close"].iloc[-1] > ma50.iloc[-1]
 
-# Construction du tableau final
-results = []
 
 for ticker in TICKERS:
     ticker = ticker.strip().upper()
