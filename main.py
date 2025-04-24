@@ -3,51 +3,63 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 import ta
-import cryptocompare
-from datetime import datetime, timedelta
 
-st.set_page_config(page_title="Scanner MA50 + MACD", layout="wide")
+st.set_page_config(page_title="Scanner MA50 Multi-timeframe", layout="wide")
 
-st.title("Scanner d'opportunités - MA50 + MACD")
+st.markdown("""
+    <style>
+        h1, h2, h3 { color: #0a3d62; }
+        .st-bw { background-color: white; padding: 1em; border-radius: 10px; box-shadow: 0px 2px 6px rgba(0,0,0,0.05); }
+        .highlight { background-color: #f5f9ff; border-radius: 8px; padding: 0.5em }
+    </style>
+""", unsafe_allow_html=True)
 
-TICKERS_STOCKS = st.text_area("Liste des actions (séparées par des virgules)", "AAPL,MSFT,GOOGL,NVDA").split(",")
-TICKERS_CRYPTOS = st.text_area("Liste des cryptos (séparées par des virgules)", "BTC,ETH,SOL,BNB").split(",")
+st.title("📊 Scanner MA50 Multi-timeframe")
 
-def get_stock_data(ticker):
+with st.sidebar:
+    st.header("Configuration")
+    TICKERS = st.text_area("Actifs (Actions ou Cryptos ex: AAPL,BTC-USD,ETH-USD)", "AAPL,MSFT,BTC-USD,ETH-USD").split(",")
+
+intervals = {
+    "Daily": "1d",
+    "Weekly": "1wk",
+    "4h": "60m",
+}
+
+def fetch_data(ticker, interval):
     try:
-        df = yf.download(ticker.strip(), period="3mo", interval="1d")
+        df = yf.download(ticker.strip(), period="6mo", interval=interval, progress=False)
         df.dropna(inplace=True)
         return df
     except:
         return None
 
-def get_crypto_data(symbol):
-    try:
-        hist = cryptocompare.get_historical_price_day(symbol.strip(), currency='USD', limit=90)
-        df = pd.DataFrame(hist)
-        df["time"] = pd.to_datetime(df["time"], unit="s")
-        df.set_index("time", inplace=True)
-        df.rename(columns={"close": "Close"}, inplace=True)
-        return df
-    except:
-        return None
-
-def check_conditions(df):
-    if "Close" not in df.columns or len(df) < 60:
+def is_above_ma50(df):
+    if df is None or "Close" not in df.columns or len(df) < 60:
         return False
+    ma50 = ta.trend.sma_indicator(df["Close"], window=50)
+    return df["Close"].iloc[-1] > ma50.iloc[-1]
 
-    df["MA50"] = ta.trend.sma_indicator(df["Close"], window=50)
-    macd = ta.trend.macd(df["Close"])
-    signal = ta.trend.macd_signal(df["Close"])
-    
-    if macd.isna().sum() > 0 or signal.isna().sum() > 0:
-        return False
+# Construction du tableau final
+results = []
 
-    is_above_ma = df["Close"].iloc[-1] > df["MA50"].iloc[-1]
-    macd_now, macd_prev = macd.iloc[-1], macd.iloc[-2]
-    signal_now, signal_prev = signal.iloc[-1], signal.iloc[-2]
+for ticker in TICKERS:
+    ticker = ticker.strip().upper()
+    row = {"Ticker": ticker}
+    score = 0
+    for label, interval in intervals.items():
+        df = fetch_data(ticker, interval)
+        status = is_above_ma50(df)
+        row[label] = "✅" if status else "❌"
+        score += 1 if status else 0
+    row["Score"] = score
+    results.append(row)
 
-    cross_up = macd_prev < signal_prev and macd_now > signal_now
-    is_positive_zone = macd_now > 0 and signal_now > 0
+# Affichage du tableau
+st.subheader("📈 Résultats classés par force relative (MA50)")
 
-    return is_above_ma and cross_up and is_positive_zone
+df_results = pd.DataFrame(results)
+df_results = df_results.sort_values(by="Score", ascending=False)
+
+st.dataframe(df_results, use_container_width=True)
+
