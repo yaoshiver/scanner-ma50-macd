@@ -60,3 +60,7 @@ def check_conditions(df):
     is_positive_zone = macd_now > 0 and signal_now > 0
 
     return is_above_ma and cross_up and is_positive_zone
+
+df = fetch_data(ticker, interval)
+if df is None or df.empty:
+    print(f"{ticker} - {interval} : Aucun résultat")
