@@ -1,0 +1,1 @@
+# scanner-ma50-macd
