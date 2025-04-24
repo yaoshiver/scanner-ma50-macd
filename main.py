@@ -46,7 +46,6 @@ def is_above_ma50(df):
     except Exception as e:
         return False
 
-
 for ticker in TICKERS:
     ticker = ticker.strip().upper()
     row = {"Ticker": ticker}
