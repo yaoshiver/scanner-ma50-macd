@@ -33,32 +33,21 @@ def get_crypto_data(symbol):
         return None
 
 def check_conditions(df):
+    if "Close" not in df.columns or len(df) < 60:
+        return False
+
     df["MA50"] = ta.trend.sma_indicator(df["Close"], window=50)
     macd = ta.trend.macd(df["Close"])
     signal = ta.trend.macd_signal(df["Close"])
     
-    if len(macd) < 2 or len(signal) < 2:
+    if macd.isna().sum() > 0 or signal.isna().sum() > 0:
         return False
-    
+
     is_above_ma = df["Close"].iloc[-1] > df["MA50"].iloc[-1]
-    macd_now = macd.iloc[-1]
-    macd_prev = macd.iloc[-2]
-    signal_now = signal.iloc[-1]
-    signal_prev = signal.iloc[-2]
+    macd_now, macd_prev = macd.iloc[-1], macd.iloc[-2]
+    signal_now, signal_prev = signal.iloc[-1], signal.iloc[-2]
 
     cross_up = macd_prev < signal_prev and macd_now > signal_now
     is_positive_zone = macd_now > 0 and signal_now > 0
 
     return is_above_ma and cross_up and is_positive_zone
-
-st.subheader("Résultats pour les actions :")
-for ticker in TICKERS_STOCKS:
-    df = get_stock_data(ticker)
-    if df is not None and check_conditions(df):
-        st.success(f"{ticker.strip()} valide les conditions.")
-
-st.subheader("Résultats pour les cryptos :")
-for ticker in TICKERS_CRYPTOS:
-    df = get_crypto_data(ticker)
-    if df is not None and check_conditions(df):
-        st.success(f"{ticker.strip()} valide les conditions.")
