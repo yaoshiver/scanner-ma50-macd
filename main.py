@@ -3,48 +3,60 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 import ta
+import cryptocompare
 
-st.set_page_config(page_title="Scanner MA50 Multi-timeframe", layout="wide")
+st.set_page_config(page_title="Scanner MA50 + MACD", layout="wide")
 
 st.markdown("""
     <style>
-        h1, h2, h3 { color: #0a3d62; }
+        .main { background-color: #f7f9fa; }
+        h1, h2, h3 { color: #083759; }
         .st-bw { background-color: white; padding: 1em; border-radius: 10px; box-shadow: 0px 2px 6px rgba(0,0,0,0.05); }
-        .highlight { background-color: #f5f9ff; border-radius: 8px; padding: 0.5em }
     </style>
 """, unsafe_allow_html=True)
 
-st.title("📊 Scanner MA50 Multi-timeframe")
+st.title("Scanner Technique : MA50 + MACD")
 
 with st.sidebar:
     st.header("Configuration")
-    TICKERS = st.text_area("Actifs (Actions ou Cryptos ex: AAPL,BTC-USD,ETH-USD)", "AAPL,MSFT,BTC-USD,ETH-USD").split(",")
+    TICKERS_STOCKS = st.text_area("Actions (ex: AAPL,MSFT,GOOGL)", "AAPL,MSFT,NVDA").split(",")
+    TICKERS_CRYPTOS = st.text_area("Cryptos (ex: BTC,ETH,SOL)", "BTC,ETH,SOL").split(",")
 
-intervals = {
-    "Daily": "1d",
-    "Weekly": "1wk",
-    "4h": "60m",
-}
-
-def fetch_data(ticker, interval):
+def get_stock_data(ticker):
     try:
-        df = yf.download(ticker.strip(), period="6mo", interval=interval, progress=False)
+        df = yf.download(ticker.strip(), period="3mo", interval="1d")
         df.dropna(inplace=True)
         return df
     except:
         return None
 
-def is_above_ma50(df):
+def get_crypto_data(symbol):
     try:
-        if df is None or "Close" not in df.columns or len(df) < 60:
-            return False
-        indicator = ta.trend.SMAIndicator(close=df["Close"], window=50)
-        ma50 = indicator.sma_indicator()
-        if ma50.isna().sum() > 0:
-            return False
-        return df["Close"].iloc[-1] > ma50.iloc[-1]
-    except Exception as e:
+        hist = cryptocompare.get_historical_price_day(symbol.strip(), currency='USD', limit=90)
+        df = pd.DataFrame(hist)
+        df["time"] = pd.to_datetime(df["time"], unit="s")
+        df.set_index("time", inplace=True)
+        df.rename(columns={"close": "Close"}, inplace=True)
+        return df
+    except:
+        return None
+
+def check_conditions(df):
+    if "Close" not in df.columns or len(df) < 60:
         return False
 
+    df["MA50"] = ta.trend.sma_indicator(df["Close"], window=50)
+    macd = ta.trend.macd(df["Close"])
+    signal = ta.trend.macd_signal(df["Close"])
+    
+    if macd.isna().sum() > 0 or signal.isna().sum() > 0:
+        return False
 
+    is_above_ma = df["Close"].iloc[-1] > df["MA50"].iloc[-1]
+    macd_now, macd_prev = macd.iloc[-1], macd.iloc[-2]
+    signal_now, signal_prev = signal.iloc[-1], signal.iloc[-2]
 
+    cross_up = macd_prev < signal_prev and macd_now > signal_now
+    is_positive_zone = macd_now > 0 and signal_now > 0
+
+    return is_above_ma and cross_up and is_positive_zone
